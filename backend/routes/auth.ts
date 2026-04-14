@@ -85,6 +85,27 @@ const sanitizeUser = (user: any) => ({
   name: user.name,
 });
 
+// Demo login — no database required, returns a JWT for a hardcoded demo user.
+// Only active when DEMO_MODE=true.
+router.post('/demo-login', (req: Request, res: Response) => {
+  if (process.env.DEMO_MODE !== 'true') {
+    return res.status(404).json({ success: false, message: 'Not found' });
+  }
+  const DEMO_USERS = [
+    { id: '1', name: 'Aubrey Huang',  email: 'aubrey@cgsadvisors.com',  role: 'consultant',        profileComplete: true },
+    { id: '2', name: 'Marcus Chen',   email: 'marcus@cgsadvisors.com',   role: 'senior_reviewer',   profileComplete: true },
+    { id: '3', name: 'Priya Nair',    email: 'priya@cgsadvisors.com',    role: 'knowledge_manager', profileComplete: true },
+    { id: '4', name: 'James Okafor', email: 'james@cgsadvisors.com',   role: 'admin',             profileComplete: true },
+  ];
+  const { userId } = req.body;
+  const user = DEMO_USERS.find((u) => u.id === userId) || DEMO_USERS[0];
+  const jwtSecret = JWT_CONFIG.SECRET || JWT_CONFIG.FALLBACK_SECRET;
+  const token = jwt.sign({ userId: user.id, email: user.email }, jwtSecret, {
+    expiresIn: JWT_CONFIG.EXPIRES_IN,
+  });
+  return res.json({ success: true, data: { token, user } });
+});
+
 // Routes
 router.post('/signup', signupHandler);
 router.post('/login', authenticateLocal, loginHandler);

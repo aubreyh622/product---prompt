@@ -5,19 +5,22 @@ import { config } from 'dotenv';
 // Ensure environment variables are loaded
 config();
 
-if (!process.env.DATABASE_URL) {
+const isDemoMode = process.env.DEMO_MODE === 'true';
+
+if (!process.env.DATABASE_URL && !isDemoMode) {
   throw new Error(
-    'DATABASE_URL is required. Current env keys: ' +
-      Object.keys(process.env).join(', ')
+    'DATABASE_URL is required. Set DEMO_MODE=true to run without a database.'
   );
 }
 
-// Database connection with connection pooling
-const client = postgres(process.env.DATABASE_URL, {
-  ssl: { rejectUnauthorized: false },
-  max: 10, // Set pool size
-  idle_timeout: 20, // Idle connection timeout in seconds
-  connect_timeout: 10, // Connection timeout in seconds
-});
-
-export const db = drizzle(client);
+// In demo mode, export null — DB-backed routes are not reachable from the demo UI.
+export const db = process.env.DATABASE_URL
+  ? drizzle(
+      postgres(process.env.DATABASE_URL, {
+        ssl: { rejectUnauthorized: false },
+        max: 10,
+        idle_timeout: 20,
+        connect_timeout: 10,
+      })
+    )
+  : null;

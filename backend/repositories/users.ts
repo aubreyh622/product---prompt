@@ -10,28 +10,23 @@ type CreateUserInput = z.infer<typeof insertUserSchema>;
 
 export class UserRepository {
   async create(userData: CreateUserInput) {
-    // Hash password before storing
+    if (!db) throw new Error('Database not available in demo mode');
     const hashedPassword = await bcrypt.hash(userData.password, 10);
-
     const [user] = await db
       .insert(users)
-      // Drizzle expects InsertUser; we trust Zod validation and assert here.
-      .values({
-        ...userData,
-        password: hashedPassword,
-      } as InsertUser)
+      .values({ ...userData, password: hashedPassword } as InsertUser)
       .returning();
-
     return user;
   }
 
   async findByEmail(email: string) {
+    if (!db) throw new Error('Database not available in demo mode');
     const [user] = await db.select().from(users).where(eq(users.email, email));
-
     return user;
   }
 
   async findAll() {
+    if (!db) throw new Error('Database not available in demo mode');
     return await db.select().from(users);
   }
 
