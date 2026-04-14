@@ -1,0 +1,20 @@
+node_modules/
+dist/
+build/
+
+# Lockfiles (repo does not currently track them)
+package-lock.json
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor/OS
+.DS_Store
+.idea/
+.vscode/

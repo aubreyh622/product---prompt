@@ -14,6 +14,8 @@ import AdminView from '@/components/custom/AdminView';
 import GoogleDrivePanel from '@/components/custom/GoogleDrivePanel';
 import ChatGPTPanel from '@/components/custom/ChatGPTPanel';
 import { getKnowledgeData, generateStarterPack, generateWearTestData } from '@/lib/mockData';
+import { generateHypotheses, generateProblemStatement, generateExecSummary } from '@/lib/engagementApi';
+import { toast } from 'sonner';
 import { Menu, X, ChevronRight, LogOut, Library, Users, ClipboardList, LayoutDashboard, Plug, Shield } from 'lucide-react';
 
 type AppStep = 1 | 2 | 3 | 4;
@@ -114,28 +116,58 @@ export default function Index() {
     setActiveRoleView('consultant');
   }
 
-  function handleActivateKnowledge(activatedBrief: EngagementBrief) {
+  async function handleActivateKnowledge(activatedBrief: EngagementBrief) {
     setBrief(activatedBrief);
     const archetype = activatedBrief.archetype || 'ai_transformation';
-    setKnowledgeData(getKnowledgeData(archetype));
+    const baseKnowledge = getKnowledgeData(archetype);
+    setKnowledgeData(baseKnowledge);
     setCompletedSteps((prev) => new Set([...prev, 1]));
     setCurrentStep(2);
+
+    // Fire-and-forget: replace mock hypotheses with AI-generated ones.
+    try {
+      const aiHypotheses = await generateHypotheses(activatedBrief);
+      if (aiHypotheses.length > 0) {
+        setKnowledgeData((prev) =>
+          prev ? { ...prev, hypotheses: aiHypotheses } : { ...baseKnowledge, hypotheses: aiHypotheses },
+        );
+      }
+    } catch (err) {
+      console.error('Hypothesis generation failed:', err);
+      // Keep mock hypotheses — no toast to avoid interrupting the demo.
+    }
   }
 
-  function handleGeneratePack(updatedKnowledge: KnowledgeActivationData) {
+  async function handleGeneratePack(updatedKnowledge: KnowledgeActivationData) {
     setKnowledgeData(updatedKnowledge);
+    if (!brief) return;
     setGenerating(true);
-    setTimeout(() => {
-      if (brief) {
-        const pack = generateStarterPack(brief);
-        const wearTest = generateWearTestData(brief);
-        setStarterPack(pack);
-        setWearTestData(wearTest);
-      }
+
+    // Start from mock pack so non-AI sections (issue tree, workstreams, etc.) render.
+    const basePack = generateStarterPack(brief);
+    const wearTest = generateWearTestData(brief);
+    const enabledFrameworkNames = updatedKnowledge.frameworks
+      .filter((f) => f.enabled)
+      .map((f) => f.name);
+
+    try {
+      const problemStatement = await generateProblemStatement(brief, enabledFrameworkNames);
+      const execSummary = await generateExecSummary(brief, problemStatement);
+      setStarterPack({
+        ...basePack,
+        problemStatement: problemStatement || basePack.problemStatement,
+        execSummary: execSummary || basePack.execSummary,
+      });
+    } catch (err) {
+      console.error('Starter pack generation failed:', err);
+      toast.error('AI generation failed — showing draft content');
+      setStarterPack(basePack);
+    } finally {
+      setWearTestData(wearTest);
       setGenerating(false);
       setCompletedSteps((prev) => new Set([...prev, 2]));
       setCurrentStep(3);
-    }, 1200);
+    }
   }
 
   function handleProceedToWearTest() {

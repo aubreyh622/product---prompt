@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { EngagementBrief, EngagementArchetype, UrgencyLevel, KnowledgeAsset, DriveConnectionStatus } from '@shared/types/api';
 import { DEMO_SCENARIOS, SCENARIO_LABELS } from '@/lib/mockData';
-import { Zap, CheckCircle, Clock, AlertCircle, FolderOpen, Library, Wifi, RefreshCw, Brain, Target } from 'lucide-react';
+import { classifyBrief, type ClassificationResult } from '@/lib/engagementApi';
+import { Zap, CheckCircle, Clock, AlertCircle, FolderOpen, Library, Wifi, RefreshCw, Brain, Loader2 } from 'lucide-react';
 
 interface BriefIntakeProps {
   onActivate: (brief: EngagementBrief) => void;
@@ -75,27 +76,6 @@ function formatDate(iso: string) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-// Archetype classification logic (client-side heuristic for display)
-function classifyArchetype(brief: EngagementBrief): { archetype: EngagementArchetype; confidence: number; rationale: string } | null {
-  const text = `${brief.objective} ${brief.coreChallenge}`.toLowerCase();
-  if (text.includes('ai') || text.includes('machine learning') || text.includes('predictive') || text.includes('digital') && text.includes('manufactur')) {
-    return { archetype: 'ai_transformation', confidence: 87, rationale: 'AI/ML keywords and manufacturing context detected' };
-  }
-  if (text.includes('stall') || text.includes('miss') || text.includes('recovery') || text.includes('governance vacuum') || text.includes('milestone')) {
-    return { archetype: 'execution_stall', confidence: 91, rationale: 'Program stall and governance failure signals detected' };
-  }
-  if (text.includes('sponsor') || text.includes('cfo') || text.includes('cto') || text.includes('misalign') || text.includes('conflict')) {
-    return { archetype: 'sponsor_misalignment', confidence: 89, rationale: 'Executive misalignment and sponsor conflict signals detected' };
-  }
-  if (text.includes('operating model') || text.includes('merger') || text.includes('redundan') || text.includes('restructur')) {
-    return { archetype: 'operating_model', confidence: 85, rationale: 'Operating model redesign and post-merger integration signals detected' };
-  }
-  if (text.includes('standardiz') || text.includes('playbook') || text.includes('delivery') || text.includes('overrun') || text.includes('methodology')) {
-    return { archetype: 'delivery_standardization', confidence: 83, rationale: 'Delivery standardization and methodology gap signals detected' };
-  }
-  return null;
-}
-
 export default function BriefIntake({ onActivate }: BriefIntakeProps) {
   const [brief, setBrief] = useState<EngagementBrief>({
     clientName: '',
@@ -107,6 +87,9 @@ export default function BriefIntake({ onActivate }: BriefIntakeProps) {
   });
   const [selectedScenario, setSelectedScenario] = useState<EngagementArchetype | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [classifying, setClassifying] = useState(false);
+  const [classification, setClassification] = useState<ClassificationResult | null>(null);
+  const [classifyError, setClassifyError] = useState<string | null>(null);
 
   const isComplete =
     brief.clientName.trim() !== '' &&
@@ -126,6 +109,26 @@ export default function BriefIntake({ onActivate }: BriefIntakeProps) {
   function loadScenario(archetype: EngagementArchetype) {
     setSelectedScenario(archetype);
     setBrief(DEMO_SCENARIOS[archetype]);
+    setClassification(null);
+    setClassifyError(null);
+  }
+
+  async function handleActivate() {
+    if (!isComplete || classifying) return;
+    setClassifying(true);
+    setClassifyError(null);
+    setClassification(null);
+    try {
+      const result = await classifyBrief(brief);
+      setClassification(result);
+      // Brief pause so the classification banner is legible before stepping forward.
+      setTimeout(() => onActivate({ ...brief, archetype: result.archetype }), 900);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Classification failed';
+      setClassifyError(message);
+    } finally {
+      setClassifying(false);
+    }
   }
 
   function handleUrgency(urgency: UrgencyLevel) {
@@ -262,52 +265,59 @@ export default function BriefIntake({ onActivate }: BriefIntakeProps) {
         </div>
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mt-8 pt-6 border-t border-[#1F3550] gap-4">
-          {/* Archetype Classification */}
-          {isComplete && (() => {
-            const classification = classifyArchetype(brief);
-            return classification ? (
-              <div className="flex items-center gap-3 p-3 bg-[#0D1B2E] border border-[#D4A843]/20 rounded-xl flex-1">
-                <div className="w-8 h-8 rounded-lg bg-[#D4A843]/15 flex items-center justify-center flex-shrink-0">
-                  <Brain className="w-4 h-4 text-[#D4A843]" />
-                </div>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-xs font-semibold text-[#D4A843]">Classified: {SCENARIO_LABELS[classification.archetype]}</p>
-                    <span className="text-xs text-[#3DAA6E] font-bold">{classification.confidence}%</span>
-                  </div>
-                  <p className="text-xs text-[#7A90A8] truncate">{classification.rationale}</p>
-                </div>
+          {/* Archetype Classification — live AI */}
+          {classifying && (
+            <div className="flex items-center gap-3 p-3 bg-[#0D1B2E] border border-[#D4A843]/20 rounded-xl flex-1">
+              <div className="w-8 h-8 rounded-lg bg-[#D4A843]/15 flex items-center justify-center flex-shrink-0">
+                <Loader2 className="w-4 h-4 text-[#D4A843] animate-spin" />
               </div>
-            ) : (
-              <p className="text-xs text-[#7A90A8]">
-                <span className="text-[#3DAA6E]">All 5 required fields completed</span>
-              </p>
-            );
-          })()}
-          {!isComplete && (
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-[#D4A843]">Classifying engagement…</p>
+                <p className="text-xs text-[#7A90A8] truncate">AI is matching your brief against CGS archetypes</p>
+              </div>
+            </div>
+          )}
+          {!classifying && classification && (
+            <div className="flex items-center gap-3 p-3 bg-[#0D1B2E] border border-[#D4A843]/20 rounded-xl flex-1">
+              <div className="w-8 h-8 rounded-lg bg-[#D4A843]/15 flex items-center justify-center flex-shrink-0">
+                <Brain className="w-4 h-4 text-[#D4A843]" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-semibold text-[#D4A843]">Classified: {SCENARIO_LABELS[classification.archetype]}</p>
+                  <span className="text-xs text-[#3DAA6E] font-bold">{classification.confidence}%</span>
+                </div>
+                <p className="text-xs text-[#7A90A8] truncate">{classification.reasoning}</p>
+              </div>
+            </div>
+          )}
+          {!classifying && !classification && classifyError && (
+            <div className="flex items-center gap-3 p-3 bg-[#0D1B2E] border border-[#E05252]/30 rounded-xl flex-1">
+              <AlertCircle className="w-4 h-4 text-[#E05252] flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-[#E05252]">Classification failed</p>
+                <p className="text-xs text-[#7A90A8] truncate">{classifyError}</p>
+              </div>
+            </div>
+          )}
+          {!classifying && !classification && !classifyError && (
             <p className="text-xs text-[#7A90A8]">
-              {completedCount} of 5 required fields completed
+              {isComplete
+                ? <span className="text-[#3DAA6E]">All 5 required fields completed</span>
+                : `${completedCount} of 5 required fields completed`}
             </p>
           )}
           <button
-            onClick={() => {
-              if (!isComplete) return;
-              const classification = classifyArchetype(brief);
-              const activatedBrief = {
-                ...brief,
-                archetype: brief.archetype || (classification?.archetype) || ('ai_transformation' as EngagementArchetype),
-              };
-              onActivate(activatedBrief);
-            }}
-            disabled={!isComplete}
+            onClick={handleActivate}
+            disabled={!isComplete || classifying}
             className={`flex items-center gap-2 px-5 md:px-6 py-3 font-semibold text-sm rounded-lg transition-all duration-200 shadow-lg ${
-              isComplete
+              isComplete && !classifying
                 ? 'bg-[#D4A843] text-[#0D1B2E] hover:bg-[#c49a3a] hover:scale-[1.02] cursor-pointer'
                 : 'bg-[#1F3550] text-[#7A90A8] cursor-not-allowed'
             }`}
           >
-            <Zap className="w-4 h-4" />
-            Activate Knowledge Base
+            {classifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+            {classifying ? 'Classifying…' : 'Activate Knowledge Base'}
           </button>
         </div>
       </div>
