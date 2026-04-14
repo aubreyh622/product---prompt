@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { User, EngagementBrief, KnowledgeActivationData, StarterPack, WearTestData } from '@shared/types/api';
 import { Toaster } from '@/components/ui/sonner';
 import OmniflowBadge from '@/components/custom/OmniflowBadge';
@@ -15,6 +15,7 @@ import GoogleDrivePanel from '@/components/custom/GoogleDrivePanel';
 import ChatGPTPanel from '@/components/custom/ChatGPTPanel';
 import { getKnowledgeData, generateStarterPack, generateWearTestData } from '@/lib/mockData';
 import { generateHypotheses, generateProblemStatement, generateExecSummary } from '@/lib/engagementApi';
+import { DEMO_MODE } from '@/config/constants';
 import { toast } from 'sonner';
 import { Menu, X, ChevronRight, LogOut, Library, Users, ClipboardList, LayoutDashboard, Plug, Shield } from 'lucide-react';
 
@@ -81,6 +82,15 @@ export default function Index() {
   const [completedSteps, setCompletedSteps] = useState<Set<AppStep>>(new Set());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeRoleView, setActiveRoleView] = useState<RoleView>('consultant');
+
+  // Auto-login in demo mode — skip the login screen entirely.
+  useEffect(() => {
+    if (DEMO_MODE && screen === 'login') {
+      setUser({ id: '1', name: 'Aubrey Huang', email: 'aubrey@cgsadvisors.com', role: 'consultant', title: 'Senior Consultant', practiceArea: 'Digital Transformation', industryFocus: 'Industrial Manufacturing', profileComplete: true, createdAt: '2026-01-01' });
+      setActiveRoleView('consultant');
+      setScreen('app');
+    }
+  }, []);
 
   const [brief, setBrief] = useState<EngagementBrief | null>(null);
   const [knowledgeData, setKnowledgeData] = useState<KnowledgeActivationData | null>(null);
