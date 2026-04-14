@@ -26,10 +26,12 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
     setLoading(true);
     setTimeout(() => {
       const user = DEMO_USERS.find((u) => u.email === email);
-      if (user && password === 'cgs2026') {
+      if (user && (password === 'cgs2026' || password === 'demo')) {
         onLogin(user);
+      } else if (!user) {
+        setError('Email not found. Use a CGS email or click a demo account below.');
       } else {
-        setError('Invalid credentials. Use a CGS email and password: cgs2026');
+        setError('Wrong password. Use: cgs2026');
       }
       setLoading(false);
     }, 800);
@@ -57,9 +59,35 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
           </div>
         </div>
 
+        {/* Quick Demo Access — primary entry point */}
+        <div className="bg-[#152338] border border-[#D4A843]/30 rounded-xl p-6 mb-4">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xs text-[#D4A843] uppercase tracking-widest font-semibold">Demo Access — Click to Enter</p>
+            <span className="text-xs bg-[#D4A843]/10 text-[#D4A843] border border-[#D4A843]/20 px-2 py-0.5 rounded-full">No password needed</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {DEMO_USERS.map((user) => (
+              <button
+                key={user.id}
+                onClick={() => quickLogin(user)}
+                disabled={loading}
+                className="flex items-center gap-2 p-3 rounded-lg border border-[#1F3550] hover:border-[#D4A843]/50 hover:bg-[#D4A843]/5 transition-all duration-200 text-left disabled:opacity-60"
+              >
+                <div className="w-8 h-8 rounded-full bg-[#2D5282] flex items-center justify-center text-xs font-bold text-[#D4A843] flex-shrink-0">
+                  {user.name.split(' ').map((n) => n[0]).join('')}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-[#E8EDF5] truncate">{user.name}</p>
+                  <p className="text-xs text-[#7A90A8] capitalize">{user.role.replace('_', ' ')}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="bg-[#152338] border border-[#1F3550] rounded-xl p-8">
           <h1 className="text-2xl font-bold text-[#E8EDF5] mb-1" style={{ fontFamily: 'Georgia, serif' }}>Sign In</h1>
-          <p className="text-sm text-[#7A90A8] mb-6">Access restricted to verified CGS Advisors staff.</p>
+          <p className="text-sm text-[#7A90A8] mb-6">Or sign in manually with a CGS email and password <span className="text-[#D4A843]">cgs2026</span>.</p>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
@@ -79,7 +107,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
+                  placeholder="cgs2026"
                   className="w-full bg-[#0D1B2E] border border-[#1F3550] rounded-lg px-4 py-3 pr-10 text-[#E8EDF5] placeholder-[#7A90A8] text-sm focus:outline-none focus:border-[#D4A843]/60 focus:ring-1 focus:ring-[#D4A843]/30 transition-all duration-200"
                 />
                 <button
@@ -101,29 +129,6 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
-
-          {/* Quick Login */}
-          <div className="mt-6 pt-6 border-t border-[#1F3550]">
-            <p className="text-xs text-[#7A90A8] mb-3 uppercase tracking-widest font-semibold">Quick Demo Access</p>
-            <div className="grid grid-cols-2 gap-2">
-              {DEMO_USERS.map((user) => (
-                <button
-                  key={user.id}
-                  onClick={() => quickLogin(user)}
-                  disabled={loading}
-                  className="flex items-center gap-2 p-2.5 rounded-lg border border-[#1F3550] hover:border-[#D4A843]/40 hover:bg-[#1F3550]/30 transition-all duration-200 text-left disabled:opacity-60"
-                >
-                  <div className="w-7 h-7 rounded-full bg-[#2D5282] flex items-center justify-center text-xs font-bold text-[#D4A843] flex-shrink-0">
-                    {user.name.split(' ').map((n) => n[0]).join('')}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-[#E8EDF5] truncate">{user.name}</p>
-                    <p className="text-xs text-[#7A90A8] capitalize">{user.role.replace('_', ' ')}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         <p className="text-center text-xs text-[#7A90A8] mt-6">CGS Delivery Copilot · Internal Use Only · CGS Advisors © 2026</p>
